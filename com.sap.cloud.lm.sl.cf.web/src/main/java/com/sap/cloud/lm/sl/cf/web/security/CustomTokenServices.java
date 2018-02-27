@@ -24,9 +24,10 @@ import org.springframework.security.oauth2.provider.token.TokenStore;
 import org.springframework.web.client.RestOperations;
 import org.springframework.web.client.RestTemplate;
 
-import com.sap.cloud.lm.sl.cf.client.util.TokenProperties;
 import com.sap.cloud.lm.sl.cf.client.util.TokenFactory;
+import com.sap.cloud.lm.sl.cf.client.util.TokenProperties;
 import com.sap.cloud.lm.sl.cf.core.auditlogging.AuditLoggingProvider;
+import com.sap.cloud.lm.sl.cf.core.security.token.TokenParserChain;
 import com.sap.cloud.lm.sl.cf.core.util.Configuration;
 import com.sap.cloud.lm.sl.cf.core.util.SSLUtil;
 import com.sap.cloud.lm.sl.cf.core.util.SecurityUtil;
@@ -39,9 +40,12 @@ public class CustomTokenServices implements ResourceServerTokenServices {
     @Autowired
     @Qualifier("tokenStore")
     TokenStore tokenStore;
-    
+
     @Autowired
     TokenFactory tokenFactory;
+
+    @Autowired
+    TokenParserChain tokenParserChain;
 
     private Configuration configuration = Configuration.getInstance();
 
@@ -103,12 +107,7 @@ public class CustomTokenServices implements ResourceServerTokenServices {
         // Check if an access token for the received token string already exists in the token store
         OAuth2AccessToken token = tokenStore.readAccessToken(tokenString);
         if (token == null) {
-            // Create a new token from the received token string
-            if (configuration.areDummyTokensEnabled() && tokenString.equals(TokenFactory.DUMMY_TOKEN)) {
-                token = tokenFactory.createDummyToken("dummy", SecurityUtil.CLIENT_ID);
-            } else {
-                token = tokenFactory.createToken(tokenString);
-            }
+            ParsedToken parsedToken = tokenParserChain.parse(tokenString);
         }
         return token;
     }
@@ -140,9 +139,6 @@ public class CustomTokenServices implements ResourceServerTokenServices {
     }
 
     private void verify(String tokenString) {
-        if (configuration.areDummyTokensEnabled() && tokenString.equals(TokenFactory.DUMMY_TOKEN)) {
-            return;
-        }
         JwtHelper.decodeAndVerify(tokenString, getSignatureVerifier(getCachedTokenKey()));
     }
 
