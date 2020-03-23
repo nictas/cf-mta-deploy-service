@@ -1,28 +1,16 @@
 package com.sap.cloud.lm.sl.cf.process.variables;
 
-import java.lang.reflect.Type;
-
 import org.immutables.value.Value;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.sap.cloud.lm.sl.cf.web.api.Nullable;
 
 @Value.Immutable
 public abstract class Variable<T> {
 
-    public static <T> TypeReference<T> typeReference(Class<T> classOfT) {
-        return new TypeReference<T>() {
-            @Override
-            public Type getType() {
-                return classOfT;
-            }
-        };
-    }
-
     public abstract String getName();
 
     @Nullable
-    public abstract TypeReference<T> getType();
+    public abstract VariableType<T> getType();
 
     @Value.Default
     public SerializationStrategy getSerializationStrategy() {
@@ -35,9 +23,11 @@ public abstract class Variable<T> {
             case DIRECT:
                 return new DirectSerializer<>();
             case JSON_STRING:
-                return new JsonStringSerializer<>(getType());
+                return new JsonStringSerializer<>(getType().getTypeReference());
             case JSON_BINARY:
-                return new JsonBinarySerializer<>(getType());
+                return new JsonBinarySerializer<>(getType().getTypeReference());
+            case ENUM:
+                return new EnumSerializer<>(getType().getClassOfT());
             default:
                 throw new IllegalStateException();
         }
