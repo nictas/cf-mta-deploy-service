@@ -1,9 +1,11 @@
 package com.sap.cloud.lm.sl.cf.process.jobs;
 
 import java.text.MessageFormat;
-import java.util.Calendar;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Date;
 import java.util.List;
+import java.util.function.Supplier;
 
 import javax.inject.Inject;
 import javax.inject.Named;
@@ -29,6 +31,7 @@ public class AbortedOperationsCleaner implements Cleaner {
     private HistoricOperationEventService historicOperationEventService;
     private FlowableFacade flowableFacade;
     private OperationService operationService;
+    private Supplier<Instant> currentInstantSupplier;
 
     @Inject
     public AbortedOperationsCleaner(HistoricOperationEventService historicOperationEventService, FlowableFacade flowableFacade,
@@ -38,13 +41,22 @@ public class AbortedOperationsCleaner implements Cleaner {
         this.operationService = operationService;
     }
 
+    @Inject
+    public AbortedOperationsCleaner(HistoricOperationEventService historicOperationEventService, FlowableFacade flowableFacade,
+                                    OperationService operationService, Supplier<Instant> currentInstantSupplier) {
+        this.historicOperationEventService = historicOperationEventService;
+        this.flowableFacade = flowableFacade;
+        this.operationService = operationService;
+        this.currentInstantSupplier = currentInstantSupplier;
+    }
+
     @Override
     public void execute(Date expirationTime) {
-        Calendar now = Calendar.getInstance();
-        now.add(Calendar.MINUTE, -30);
+        Instant instant = currentInstantSupplier.get()
+                                             .minus(30, ChronoUnit.MINUTES);
         List<HistoricOperationEvent> abortedOperations = historicOperationEventService.createQuery()
                                                                                       .type(EventType.ABORTED)
-                                                                                      .olderThan(now.getTime())
+                                                                                      .olderThan(new Date(instant.toEpochMilli()))
                                                                                       .list();
         abortedOperations.stream()
                          .map(HistoricOperationEvent::getProcessId)
